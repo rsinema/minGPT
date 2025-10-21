@@ -25,7 +25,9 @@ class NewGELU(nn.Module):
     """
     def forward(self, x):
         return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
-    
+
+# -----------------------------------------------------------------------------
+# SigGLU
 class SwiGLU(nn.Module):
     def __init__(self, dim_in, dim_hidden=None, dim_out=None, bias=True):
         super().__init__()
@@ -53,6 +55,62 @@ class SwiGLU(nn.Module):
         # Output projection
         return self.w3(hidden)
 
+# -----------------------------------------------------------------------------
+# Rotary Positional Embeddings
+
+class RotaryEmbedding(nn.Module):
+    def __init__(self, dim, base=10000, interleaved=False):
+        super().__init__()
+        self.dim = dim
+        self.base = base
+        self.interleaved = interleaved
+        
+        # Generate inverse frequency bands
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer('inv_freq', inv_freq)
+    
+    def forward(self, seq_len, device=None):
+        # Get device from buffer if not specified
+        if device is None:
+            device = self.inv_freq.device
+            
+        # Generate position indices
+        positions = torch.arange(seq_len, device=device).float()
+        
+        # Compute sinusoidal patterns
+        freqs = torch.outer(positions, self.inv_freq)
+        
+        # Get sine and cosine embeddings
+        emb = torch.cat((freqs, freqs), dim=-1)
+        cos = torch.cos(emb)[:, :self.dim]
+        sin = torch.sin(emb)[:, :self.dim]
+        
+        return cos, sin
+
+def apply_rotary_pos_emb(q, k, cos, sin, interleaved=False):
+    # Apply rotary embeddings to queries and keys
+    batch_size, num_heads, seq_len, head_dim = q.shape
+    cos = cos.reshape(1, 1, seq_len, cos.shape[-1])  # [1, 1, seq_len, dim/2]
+    sin = sin.reshape(1, 1, seq_len, sin.shape[-1])  # [1, 1, seq_len, dim/2]
+    
+    # Split queries and keys for rotation
+    half_dim = head_dim // 2
+    q1, q2 = q[..., :half_dim], q[..., half_dim:]
+    k1, k2 = k[..., :half_dim], k[..., half_dim:]
+    
+    # Apply rotation using half-dim rotary embeddings
+    q_rotated = torch.cat([
+        q1 * cos - q2 * sin,
+        q2 * cos + q1 * sin
+    ], dim=-1)
+    
+    k_rotated = torch.cat([
+        k1 * cos - k2 * sin,
+        k2 * cos + k1 * sin
+    ], dim=-1)
+    
+    return q_rotated, k_rotated
+
 class CausalSelfAttention(nn.Module):
     """
     A vanilla multi-head masked self-attention layer with a projection at the end.
@@ -76,14 +134,22 @@ class CausalSelfAttention(nn.Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
 
+        self.rope = config.rope
+        if self.rope:
+            self.rotary_emb = RotaryEmbedding(dim=(config.n_embd // config.n_head) // 2)
+
     def forward(self, x):
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-        q, k ,v  = self.c_attn(x).split(self.n_embd, dim=2)
+        q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+
+        if self.rope:
+            cos, sin = self.rotary_emb(T, device=x.device)
+            q, k = apply_rotary_pos_emb(q, k, cos, sin, interleaved=False)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
@@ -147,6 +213,7 @@ class GPT(nn.Module):
         C.attn_pdrop = 0.1
 
         C.swiglu = False  # whether to use SwiGLU activations in the MLPs
+        C.rope = False  # whether to use Rotary Positional Embeddings in attention
         return C
 
     def __init__(self, config):
@@ -347,24 +414,42 @@ class GPT(nn.Module):
         return idx
 
 if __name__ == '__main__':
-    # NewGELU test
-    gelu = NewGELU()
-    x = torch.linspace(-3, 3, steps=100).unsqueeze(0)  # add batch dimension
-    print(f"X shape: {x.shape}, GELU(X) shape: {gelu(x).shape}")
+    # # NewGELU test
+    # gelu = NewGELU()
+    # x = torch.linspace(-3, 3, steps=100).unsqueeze(0)  # add batch dimension
+    # print(f"X shape: {x.shape}, GELU(X) shape: {gelu(x).shape}")
 
-    # SwiGLU test
-    swiglu = SwiGLU(dim_in=100, dim_out=100)
-    x = torch.linspace(-3, 3, steps=100).unsqueeze(0)  # add batch dimension
-    print(f"X shape: {x.shape}, SwiGLU(X) shape: {swiglu(x).shape}")
+    # # SwiGLU test
+    # swiglu = SwiGLU(dim_in=100, dim_out=100)
+    # x = torch.linspace(-3, 3, steps=100).unsqueeze(0)  # add batch dimension
+    # print(f"X shape: {x.shape}, SwiGLU(X) shape: {swiglu(x).shape}")
 
-    # Block with SwiGLU test
+    # # Block with SwiGLU test
+    # config = GPT.get_default_config()
+    # config.n_embd = 100
+    # config.n_head = 5
+    # config.n_layer = 2
+    # config.block_size = 10
+    # config.vocab_size = 1000
+    # config.swiglu = True  # Enable SwiGLU activations
+    # block = Block(config)
+    # x = torch.randn(2, 10, 100)  # batch size 2
+    # print(f"Input shape: {x.shape}, Block output shape: {block(x).shape}")
+
+    # Rotary Embedding test
+    rotary_emb = RotaryEmbedding(dim=32)
+    seq_len = 20
+    cos, sin = rotary_emb(seq_len)
+    print(f"Cosine shape: {cos.shape}, Sine shape: {sin.shape}")
+
+    # CausalSelfAttention with RoPE test
     config = GPT.get_default_config()
-    config.n_embd = 100
-    config.n_head = 5
+    config.n_embd = 64
+    config.n_head = 8
     config.n_layer = 2
-    config.block_size = 10
+    config.block_size = 20
     config.vocab_size = 1000
-    config.swiglu = True  # Enable SwiGLU activations
-    block = Block(config)
-    x = torch.randn(2, 10, 100)  # batch size 2
-    print(f"Input shape: {x.shape}, Block output shape: {block(x).shape}")
+    config.rope = True  # Enable RoPE
+    attn = CausalSelfAttention(config)
+    x = torch.randn(2, 20, 64)  # batch size, sequence length, embedding dim
+    print(f"Input shape: {x.shape}, CausalSelfAttention output shape: {attn(x).shape}")
