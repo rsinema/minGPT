@@ -349,7 +349,7 @@ class GPT(nn.Module):
 if __name__ == '__main__':
     # NewGELU test
     gelu = NewGELU()
-    x = torch.linspace(-3, 3, steps=100)
+    x = torch.linspace(-3, 3, steps=100).unsqueeze(0)  # add batch dimension
     print(f"X shape: {x.shape}, GELU(X) shape: {gelu(x).shape}")
 
     # SwiGLU test
