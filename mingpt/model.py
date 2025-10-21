@@ -111,6 +111,8 @@ def apply_rotary_pos_emb(q, k, cos, sin, interleaved=False):
     
     return q_rotated, k_rotated
 
+# -----------------------------------------------------------------------------
+
 class CausalSelfAttention(nn.Module):
     """
     A vanilla multi-head masked self-attention layer with a projection at the end.
