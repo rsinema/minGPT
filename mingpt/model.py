@@ -25,6 +25,33 @@ class NewGELU(nn.Module):
     """
     def forward(self, x):
         return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
+    
+class SwiGLU(nn.Module):
+    def __init__(self, dim_in, dim_hidden=None, dim_out=None, bias=True):
+        super().__init__()
+        dim_hidden = dim_hidden or 4 * dim_in
+        dim_out = dim_out or dim_in
+        
+        # Linear transformations for gating
+        self.w1 = nn.Linear(dim_in, dim_hidden, bias=bias)
+        self.w2 = nn.Linear(dim_in, dim_hidden, bias=bias)
+        
+        # Output projection
+        self.w3 = nn.Linear(dim_hidden, dim_out, bias=bias)
+    
+    def forward(self, x):
+        # SwiGLU applies SiLU activation to one branch and gates it with the other
+        hidden1 = self.w1(x)
+        hidden2 = self.w2(x)
+        
+        # SiLU (Swish) activation: x * sigmoid(x)
+        hidden1_act = hidden1 * torch.sigmoid(hidden1)
+        
+        # Element-wise product for gating
+        hidden = hidden1_act * hidden2
+        
+        # Output projection
+        return self.w3(hidden)
 
 class CausalSelfAttention(nn.Module):
     """
@@ -78,12 +105,20 @@ class Block(nn.Module):
         self.ln_1 = nn.LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
         self.ln_2 = nn.LayerNorm(config.n_embd)
-        self.mlp = nn.ModuleDict(dict(
-            c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd),
-            c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
-            act     = NewGELU(),
-            dropout = nn.Dropout(config.resid_pdrop),
-        ))
+        if not config.swiglu:
+            self.mlp = nn.ModuleDict(dict(
+                c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd),
+                c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
+                act     = NewGELU(),
+                dropout = nn.Dropout(config.resid_pdrop),
+            ))
+        else:
+            self.mlp = nn.ModuleDict(dict(
+                c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd),
+                c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
+                act     = SwiGLU(dim_in=config.n_embd * 4),
+                dropout = nn.Dropout(config.resid_pdrop),
+            ))
         m = self.mlp
         self.mlpf = lambda x: m.dropout(m.c_proj(m.act(m.c_fc(x)))) # MLP forward
 
@@ -110,6 +145,8 @@ class GPT(nn.Module):
         C.embd_pdrop = 0.1
         C.resid_pdrop = 0.1
         C.attn_pdrop = 0.1
+
+        C.swiglu = False  # whether to use SwiGLU activations in the MLPs
         return C
 
     def __init__(self, config):
@@ -308,3 +345,26 @@ class GPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
+
+if __name__ == '__main__':
+    # NewGELU test
+    gelu = NewGELU()
+    x = torch.linspace(-3, 3, steps=100)
+    print(f"X shape: {x.shape}, GELU(X) shape: {gelu(x).shape}")
+
+    # SwiGLU test
+    swiglu = SwiGLU(dim_in=100, dim_out=100)
+    x = torch.linspace(-3, 3, steps=100).unsqueeze(0)  # add batch dimension
+    print(f"X shape: {x.shape}, SwiGLU(X) shape: {swiglu(x).shape}")
+
+    # Block with SwiGLU test
+    config = GPT.get_default_config()
+    config.n_embd = 100
+    config.n_head = 5
+    config.n_layer = 2
+    config.block_size = 10
+    config.vocab_size = 1000
+    config.swiglu = True  # Enable SwiGLU activations
+    block = Block(config)
+    x = torch.randn(2, 10, 100)  # batch size 2
+    print(f"Input shape: {x.shape}, Block output shape: {block(x).shape}")
