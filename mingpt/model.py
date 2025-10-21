@@ -128,6 +128,8 @@ class LinearWarmupScheduler(_LRScheduler):
         else:
             # After warmup: use base learning rate
             return self.base_lrs
+        
+# -----------------------------------------------------------------------------
 
 class CausalSelfAttention(nn.Module):
     """
