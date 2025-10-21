@@ -94,7 +94,8 @@ train_config.learning_rate = 5e-4 # the model we're using is so small that we ca
 train_config.max_iters = 1000
 train_config.num_workers = 0
 # train_config.lw_scheduler = True
-# train_config.warmup_steps = 200
+train_config.warmup_steps = 200
+train_config.cos_scheduler = True
 trainer = Trainer(train_config, model, train_dataset)
 
 

@@ -130,6 +130,31 @@ class LinearWarmupScheduler(_LRScheduler):
             return self.base_lrs
         
 # -----------------------------------------------------------------------------
+# Cosine Annealing Scheduler with Warmup
+class CosineAnnealingWarmupScheduler(_LRScheduler):
+    def __init__(self, optimizer, warmup_steps, total_steps, min_lr_ratio=1e-4, last_epoch=-1):
+        self.warmup_steps = warmup_steps
+        self.total_steps = total_steps
+        self.min_lr_ratio = min_lr_ratio
+        super().__init__(optimizer, last_epoch)
+    
+    def get_lr(self):
+        if self.last_epoch < self.warmup_steps:
+            # During warmup: linearly increase from 0 to base LR
+            scale = float(self.last_epoch + 1) / float(max(1, self.warmup_steps))
+            return [base_lr * scale for base_lr in self.base_lrs]
+        else:
+            # After warmup: cosine decay from base LR to min_lr
+            progress = float(self.last_epoch - self.warmup_steps) / float(
+                max(1, self.total_steps - self.warmup_steps)
+            )
+            # Cosine decay formula: min_lr + 0.5 * (base_lr - min_lr) * (1 + cos(pi * progress))
+            scale = self.min_lr_ratio + 0.5 * (1.0 - self.min_lr_ratio) * (
+                1.0 + math.cos(math.pi * progress)
+            )
+            return [base_lr * scale for base_lr in self.base_lrs]
+
+# -----------------------------------------------------------------------------
 
 class CausalSelfAttention(nn.Module):
     """
@@ -380,9 +405,22 @@ class GPT(nn.Module):
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
 
+        if train_config.cos_scheduler and train_config.lw_scheduler:
+            raise ValueError("Cannot use both cosine scheduler and linear warmup scheduler simultaneously.")
+
         if train_config.lw_scheduler:
             scheduler = LinearWarmupScheduler(optimizer, warmup_steps=train_config.warmup_steps)
 
+            return optimizer, scheduler
+        
+        if train_config.cos_scheduler:
+            total_steps = train_config.max_iters - train_config.warmup_steps
+            scheduler = CosineAnnealingWarmupScheduler(
+                optimizer,
+                warmup_steps=train_config.warmup_steps,
+                total_steps=total_steps,
+                min_lr_ratio=1e-4
+            )
             return optimizer, scheduler
 
         return optimizer, None

@@ -28,8 +28,9 @@ class Trainer:
         C.grad_norm_clip = 1.0
 
         C.lw_scheduler = False
+        C.cos_scheduler = False
+
         C.warmup_steps = 1000
-        
         return C
 
     def __init__(self, config, model, train_dataset):
