@@ -82,7 +82,7 @@ model_config.model_type = 'gpt-nano'
 model_config.vocab_size = train_dataset.get_vocab_size()
 model_config.block_size = train_dataset.get_block_size()
 # model_config.swiglu = True  # Enable SwiGLU activation
-model_config.rope = True    # Enable Rotary Positional Embeddings
+# model_config.rope = True    # Enable Rotary Positional Embeddings
 model = GPT(model_config)
 
 
@@ -91,8 +91,10 @@ from mingpt.trainer import Trainer
 
 train_config = Trainer.get_default_config()
 train_config.learning_rate = 5e-4 # the model we're using is so small that we can go a bit faster
-train_config.max_iters = 500
+train_config.max_iters = 1000
 train_config.num_workers = 0
+# train_config.lw_scheduler = True
+# train_config.warmup_steps = 200
 trainer = Trainer(train_config, model, train_dataset)
 
 

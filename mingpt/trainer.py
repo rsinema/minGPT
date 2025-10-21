@@ -26,6 +26,10 @@ class Trainer:
         C.betas = (0.9, 0.95)
         C.weight_decay = 0.1 # only applied on matmul weights
         C.grad_norm_clip = 1.0
+
+        C.lw_scheduler = False
+        C.warmup_steps = 1000
+        
         return C
 
     def __init__(self, config, model, train_dataset):
@@ -62,7 +66,7 @@ class Trainer:
         model, config = self.model, self.config
 
         # setup the optimizer
-        self.optimizer = model.configure_optimizers(config)
+        self.optimizer, self.scheduler = model.configure_optimizers(config)
 
         # setup the dataloader
         train_loader = DataLoader(
@@ -97,6 +101,8 @@ class Trainer:
             self.loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
             self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             self.trigger_callbacks('on_batch_end')
             self.iter_num += 1

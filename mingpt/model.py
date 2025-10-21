@@ -13,6 +13,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch.optim.lr_scheduler import _LRScheduler
 
 from mingpt.utils import CfgNode as CN
 
@@ -112,6 +113,21 @@ def apply_rotary_pos_emb(q, k, cos, sin, interleaved=False):
     return q_rotated, k_rotated
 
 # -----------------------------------------------------------------------------
+# Linear Warmup Scheduler
+class LinearWarmupScheduler(_LRScheduler):
+    def __init__(self, optimizer, warmup_steps, last_epoch=-1):
+        self.warmup_steps = warmup_steps
+        self.p = True
+        super().__init__(optimizer, last_epoch)
+    
+    def get_lr(self):
+        if self.last_epoch < self.warmup_steps:
+            # During warmup: linearly increase from 0 to base LR
+            scale = float(self.last_epoch + 1) / float(max(1, self.warmup_steps))
+            return [base_lr * scale for base_lr in self.base_lrs]
+        else:
+            # After warmup: use base learning rate
+            return self.base_lrs
 
 class CausalSelfAttention(nn.Module):
     """
@@ -361,7 +377,13 @@ class GPT(nn.Module):
             {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
-        return optimizer
+
+        if train_config.lw_scheduler:
+            scheduler = LinearWarmupScheduler(optimizer, warmup_steps=train_config.warmup_steps)
+
+            return optimizer, scheduler
+
+        return optimizer, None
 
     def forward(self, idx, targets=None):
         device = idx.device
