@@ -241,21 +241,26 @@ class Block(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.ln_1 = nn.LayerNorm(config.n_embd)
+        if config.rms_norm:
+            self.ln_1 = RMSNorm(config.n_embd)
+            self.ln_2 = RMSNorm(config.n_embd)
+        else:
+            self.ln_1 = nn.LayerNorm(config.n_embd)
+            self.ln_2 = nn.LayerNorm(config.n_embd)
+        
         self.attn = CausalSelfAttention(config)
-        self.ln_2 = nn.LayerNorm(config.n_embd)
-        if not config.swiglu:
+        if config.swiglu:
             self.mlp = nn.ModuleDict(dict(
                 c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd),
                 c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
-                act     = NewGELU(),
+                act     = SwiGLU(dim_in=config.n_embd * 4),
                 dropout = nn.Dropout(config.resid_pdrop),
             ))
         else:
             self.mlp = nn.ModuleDict(dict(
                 c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd),
                 c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
-                act     = SwiGLU(dim_in=config.n_embd * 4),
+                act     = NewGELU(),
                 dropout = nn.Dropout(config.resid_pdrop),
             ))
         m = self.mlp
@@ -287,6 +292,7 @@ class GPT(nn.Module):
 
         C.swiglu = False  # whether to use SwiGLU activations in the MLPs
         C.rope = False  # whether to use Rotary Positional Embeddings in attention
+        C.rms_norm = False  # whether to use RMSNorm instead of LayerNorm
         return C
 
     def __init__(self, config):
@@ -401,7 +407,7 @@ class GPT(nn.Module):
         decay = set()
         no_decay = set()
         whitelist_weight_modules = (torch.nn.Linear, )
-        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        blacklist_weight_modules = (torch.nn.LayerNorm, RMSNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
@@ -530,20 +536,32 @@ if __name__ == '__main__':
     # x = torch.randn(2, 10, 100)  # batch size 2
     # print(f"Input shape: {x.shape}, Block output shape: {block(x).shape}")
 
-    # Rotary Embedding test
-    rotary_emb = RotaryEmbedding(dim=32)
-    seq_len = 20
-    cos, sin = rotary_emb(seq_len)
-    print(f"Cosine shape: {cos.shape}, Sine shape: {sin.shape}")
+    # # Rotary Embedding test
+    # rotary_emb = RotaryEmbedding(dim=32)
+    # seq_len = 20
+    # cos, sin = rotary_emb(seq_len)
+    # print(f"Cosine shape: {cos.shape}, Sine shape: {sin.shape}")
 
-    # CausalSelfAttention with RoPE test
+    # # CausalSelfAttention with RoPE test
+    # config = GPT.get_default_config()
+    # config.n_embd = 64
+    # config.n_head = 8
+    # config.n_layer = 2
+    # config.block_size = 20
+    # config.vocab_size = 1000
+    # config.rope = True  # Enable RoPE
+    # attn = CausalSelfAttention(config)
+    # x = torch.randn(2, 20, 64)  # batch size, sequence length, embedding dim
+    # print(f"Input shape: {x.shape}, CausalSelfAttention output shape: {attn(x).shape}")
+
+    # RMSNorm test
     config = GPT.get_default_config()
     config.n_embd = 64
     config.n_head = 8
     config.n_layer = 2
     config.block_size = 20
-    config.vocab_size = 1000
-    config.rope = True  # Enable RoPE
-    attn = CausalSelfAttention(config)
+    config.rms_norm = True  # Enable RMSNorm
+    # Block with RMSNorm test
+    block = Block(config)
     x = torch.randn(2, 20, 64)  # batch size, sequence length, embedding dim
-    print(f"Input shape: {x.shape}, CausalSelfAttention output shape: {attn(x).shape}")
+    print(f"Input shape: {x.shape}, Block with RMSNorm output shape: {block(x).shape}")
