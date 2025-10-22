@@ -155,6 +155,33 @@ class CosineAnnealingWarmupScheduler(_LRScheduler):
             return [base_lr * scale for base_lr in self.base_lrs]
 
 # -----------------------------------------------------------------------------
+# RMSNorm
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim, eps=1e-8, elementwise_affine=True):
+        super().__init__()
+        self.eps = eps
+        self.elementwise_affine = elementwise_affine
+        
+        if elementwise_affine:
+            self.weight = nn.Parameter(torch.ones(dim))
+        else:
+            self.register_parameter('weight', None)
+    
+    def forward(self, x):
+        # Calculate root mean square along the last dimension
+        rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True) + self.eps)
+        
+        # Normalize by RMS
+        x_normalized = x / rms
+        
+        # Apply scaling if using learnable parameters
+        if self.elementwise_affine:
+            x_normalized = x_normalized * self.weight
+        
+        return x_normalized
+    
+# -----------------------------------------------------------------------------
 
 class CausalSelfAttention(nn.Module):
     """
@@ -208,34 +235,6 @@ class CausalSelfAttention(nn.Module):
         y = self.resid_dropout(self.c_proj(y))
         return y
     
-# -----------------------------------------------------------------------------
-# RMSNorm
-
-class RMSNorm(nn.Module):
-    def __init__(self, dim, eps=1e-8, elementwise_affine=True):
-        super().__init__()
-        self.eps = eps
-        self.elementwise_affine = elementwise_affine
-        
-        if elementwise_affine:
-            self.weight = nn.Parameter(torch.ones(dim))
-        else:
-            self.register_parameter('weight', None)
-    
-    def forward(self, x):
-        # Calculate root mean square along the last dimension
-        rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True) + self.eps)
-        
-        # Normalize by RMS
-        x_normalized = x / rms
-        
-        # Apply scaling if using learnable parameters
-        if self.elementwise_affine:
-            x_normalized = x_normalized * self.weight
-        
-        return x_normalized
-    
-    # -----------------------------------------------------------------------------
 
 class Block(nn.Module):
     """ an unassuming Transformer block """
@@ -505,6 +504,8 @@ class GPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
+    
+# XXX: dataset copy cmd: cp /nobackup/archive/usr/dw87/pile_data_10.jsonl /nobackup/autodelete/usr/rsinema
 
 if __name__ == '__main__':
     # # NewGELU test
