@@ -1,6 +1,7 @@
 # main training script for the lab
 
 import os
+import time
 from dotenv import load_dotenv
 
 def build_configs(config: dict):
@@ -57,7 +58,12 @@ def main(config: dict):
 
     trainer.set_callback('on_batch_end', batch_end_callback)
     print("Starting training...")
+    start_wall_time = time.time()
     trainer.run()
+    end_wall_time = time.time()
+    # write this to a file
+    with open(os.path.join(output_dir, 'training_time.txt'), 'w') as f:
+        f.write(f"Total training time: {end_wall_time - start_wall_time:.2f} seconds\n")
 
 if __name__ == '__main__':
     # need to take in arguments from command line
@@ -68,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--lw_scheduler', '-l', action='store_true', help='Use linear warmup scheduler instead of cosine')
     parser.add_argument('--cos_scheduler', '-c', action='store_true', help='Use cosine annealing scheduler')
     parser.add_argument('--rms_norm', '-R', action='store_true', help='Use RMSNorm instead of LayerNorm in the model')
-    parser.add_argument('--max_iters', '-m', type=int, default=1000, help='Maximum number of training iterations')
+    parser.add_argument('--max_iters', '-m', type=int, default=10000, help='Maximum number of training iterations')
     parser.add_argument('--batch_size', '-b', type=int, default=64, help='Batch size for training')
     parser.add_argument('--subset', action='store_true', help='Use a small subset of data to use for training')
     parser.add_argument('--model', '-M', type=str, default='gpt2', help='Model architecture to use (e.g., gpt2, gpt2-medium)')
