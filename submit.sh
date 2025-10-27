@@ -12,7 +12,7 @@
 module load python/3.11
 cd /home/rsinema/minGPT
 source .venv/bin/activate
-python train.py --model gpt-nano --batch_size 1 --exp_name test_base
+python train.py --model gpt-nano --batch_size 8 --exp_name test_base
 
 # run module load python/3.11
 # make sure you cd into your compute folder

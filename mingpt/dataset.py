@@ -13,7 +13,7 @@ class JSONLDataset(Dataset):
         with open(self.file_path, 'r') as f:
             lines = f.readlines()
         
-        print(f'Length of lines: {len(lines)}')
+        # print(f'Length of lines: {len(lines)}')
         prelength = len(lines)
         data = []
         for i, line in enumerate(lines):
@@ -27,7 +27,7 @@ class JSONLDataset(Dataset):
             except json.JSONDecodeError:
                 # Silently skip lines that fail to parse
                 pass 
-        print(f'Length of data: {len(data) / prelength * 100:.2f}%')
+        # print(f'Length of data: {len(data) / prelength * 100:.2f}%')
 
         # calulate the vocab size
         self.vocab_size = self.tokenizer.get_vocab_size()
@@ -64,9 +64,9 @@ class JSONLDataset(Dataset):
     def get_block_size(self):
         return self.block_size
 
-file_path = '/nobackup/autodelete/usr/rsinema/pile_data_10_min.jsonl'
+# file_path = '/nobackup/autodelete/usr/rsinema/pile_data_10_min.jsonl'
 # file_path = 'pile_data_10_first_50000.jsonl'
 # file_path = '100.jsonl'
 # Initialize the dataset with a test size of 1000 lines
-train_dataset = JSONLDataset(file_path, split='train', test_size=10)
+# train_dataset = JSONLDataset(file_path, split='train', test_size=10)
 # print(len(train_dataset))
