@@ -25,7 +25,7 @@ def main(config: dict):
 
     model_config, trainer_config = build_configs(config)
 
-    file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_min.jsonl')
+    file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_subset.jsonl')
     output_dir = os.path.join('output', 'experiments', config.get('exp_name', 'default_exp'))
     print(f"Output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
