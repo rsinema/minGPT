@@ -83,6 +83,8 @@ class Trainer:
         self.iter_num = 0
         self.iter_time = time.time()
         data_iter = iter(train_loader)
+        # need to save the losses for logging purposes
+        self.losses = []
         while True:
 
             # fetch the next batch (x, y) and re-init iterator if needed
