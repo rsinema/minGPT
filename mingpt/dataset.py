@@ -69,5 +69,4 @@ file_path = '/nobackup/autodelete/usr/rsinema/pile_data_10_min.jsonl'
 # file_path = '100.jsonl'
 # Initialize the dataset with a test size of 1000 lines
 train_dataset = JSONLDataset(file_path, split='train', test_size=10)
-print(len(train_dataset))
-print(train_dataset[0])
+# print(len(train_dataset))

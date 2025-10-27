@@ -26,16 +26,18 @@ def main(config: dict):
     model_config, trainer_config = build_configs(config)
 
     file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_min.jsonl')
-    output_dir = os.getenv('OUTPUT_DIR', 'output').join(config.get('exp_name', 'default_exp'))
+    output_dir = os.path.join('output', 'experiments', config.get('exp_name', 'default_exp'))
     print(f"Output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
 
+    print("Loading datasets...")
     train_dataset = JSONLDataset(file_path, split='train', test_size=10)
     val_dataset = JSONLDataset(file_path, split='val', test_size=10)
 
     model_config.vocab_size = train_dataset.get_vocab_size()
     model_config.block_size = train_dataset.get_block_size()
 
+    print("Creating model...")
     model = GPT(model_config)
 
     trainer = Trainer(trainer_config, model, train_dataset)
@@ -53,6 +55,8 @@ def main(config: dict):
                 torch.save(model.state_dict(), ckpt_path)
                 print(f"Saved model checkpoint to {ckpt_path}")
 
+    trainer.set_callback('on_batch_end', batch_end_callback)
+    print("Starting training...")
     trainer.run()
 
 if __name__ == '__main__':

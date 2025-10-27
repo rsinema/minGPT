@@ -98,6 +98,7 @@ class Trainer:
 
             # forward the model
             logits, self.loss = model(x, y)
+            self.losses.append(self.loss.item())
 
             # backprop and update the parameters
             model.zero_grad(set_to_none=True)
