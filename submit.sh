@@ -12,13 +12,13 @@
 module load python/3.11
 cd /home/rsinema/minGPT
 source .venv/bin/activate
-python train.py --model gpt2 --batch_size 8 --exp_name base
-python train.py --model gpt2 --batch_size 8 --swiglu --exp_name swiglu
-python train.py --model gpt2 --batch_size 8 --rope --exp_name rope
-python train.py --model gpt2 --batch_size 8 --lw_scheduler --exp_name lw_scheduler
-python train.py --model gpt2 --batch_size 8 --cos_scheduler --exp_name cos_scheduler
-python train.py --model gpt2 --batch_size 8 --rms_norm --exp_name rms_norm
-python train.py --model gpt2 --batch_size 8 -a --exp_name all_features
+python train.py --model gpt2 --batch_size 16 --exp_name base
+python train.py --model gpt2 --batch_size 16 --swiglu --exp_name swiglu
+python train.py --model gpt2 --batch_size 16 --rope --exp_name rope
+python train.py --model gpt2 --batch_size 16 --lw_scheduler --exp_name lw_scheduler
+python train.py --model gpt2 --batch_size 16 --cos_scheduler --exp_name cos_scheduler
+python train.py --model gpt2 --batch_size 16 --rms_norm --exp_name rms_norm
+python train.py --model gpt2 --batch_size 16 -a --exp_name all_features
 
 # run module load python/3.11
 # make sure you cd into your compute folder

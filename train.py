@@ -26,14 +26,14 @@ def main(config: dict):
 
     model_config, trainer_config = build_configs(config)
 
-    file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_subset.jsonl')
+    file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_100000.jsonl')
     output_dir = os.path.join('output', 'experiments', config.get('exp_name', 'default_exp'))
     print(f"Output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
 
     print("Loading datasets...")
-    train_dataset = JSONLDataset(file_path, split='train', test_size=10)
-    val_dataset = JSONLDataset(file_path, split='val', test_size=10)
+    train_dataset = JSONLDataset(file_path, split='train', test_size=1000)
+    val_dataset = JSONLDataset(file_path, split='val', test_size=1000)
 
     model_config.vocab_size = train_dataset.get_vocab_size()
     model_config.block_size = train_dataset.get_block_size()
@@ -50,11 +50,29 @@ def main(config: dict):
             # save losses to a file using torch.save
             torch.save(trainer.losses, os.path.join(output_dir, 'train_losses.pt'))
 
+            # write most recent loss to a text file
+            with open(os.path.join(output_dir, 'latest_loss.txt'), 'w') as f:
+                f.write(f"Loss at {trainer.iter_num}: {trainer.loss.item()}\n")
+
             if trainer.iter_num % 1000 == 0:
                 # save the model checkpoint
                 ckpt_path = os.path.join(output_dir, f'model_iter_{trainer.iter_num}.pt')
                 torch.save(model.state_dict(), ckpt_path)
                 print(f"Saved model checkpoint to {ckpt_path}")
+
+                # write validation loss
+                model.eval()
+                val_losses = []
+                val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=trainer.config.batch_size, shuffle=False)
+                with torch.no_grad():
+                    for x, y in val_loader:
+                        x, y = x.to(trainer.device), y.to(trainer.device)
+                        _, loss = model(x, y)
+                        val_losses.append(loss.item())
+                avg_val_loss = sum(val_losses) / len(val_losses)
+                with open(os.path.join(output_dir, 'validation_loss.txt'), 'a') as f:
+                    f.write(f"Validation loss at iter {trainer.iter_num}: {avg_val_loss}\n")
+                model.train()
 
     trainer.set_callback('on_batch_end', batch_end_callback)
     print("Starting training...")
