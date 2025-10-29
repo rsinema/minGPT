@@ -4,7 +4,7 @@
 #SBATCH --output=output/slurm_logs/slurm-%j.out   # File to capture standard output
 #SBATCH --error=output/slurm_logs/slurm-%j.err    # Redirect standard error to a separate file
 #SBATCH --qos=dw87              # The quality of service queue
-#SBATCH --time=03:00:00         # 3 hours of wall-clock time
+#SBATCH --time=01:00:00         # 1 hour of wall-clock time
 #SBATCH --gpus=1                # Request 1 GPU
 #SBATCH --mem=128G               # Request 128GB of memory
 #SBATCH --cpus-per-task=32       # Request 32 CPU cores
