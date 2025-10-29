@@ -26,7 +26,7 @@ def main(config: dict):
 
     model_config, trainer_config = build_configs(config)
 
-    file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_100000.jsonl')
+    file_path = os.getenv('DATASET_PATH', '/nobackup/autodelete/usr/rsinema/pile_data_10_mil.jsonl')
     output_dir = os.path.join('output', 'experiments', config.get('exp_name', 'default_exp'))
     print(f"Output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
@@ -51,7 +51,7 @@ def main(config: dict):
             torch.save(trainer.losses, os.path.join(output_dir, 'train_losses.pt'))
 
             # write most recent loss to a text file
-            with open(os.path.join(output_dir, 'latest_loss.txt'), 'w') as f:
+            with open(os.path.join(output_dir, 'latest_loss.txt'), 'a') as f:
                 f.write(f"Loss at {trainer.iter_num}: {trainer.loss.item()}\n")
 
             if trainer.iter_num % 1000 == 0:
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     parser.add_argument('--lw_scheduler', '-l', action='store_true', help='Use linear warmup scheduler instead of cosine')
     parser.add_argument('--cos_scheduler', '-c', action='store_true', help='Use cosine annealing scheduler')
     parser.add_argument('--rms_norm', '-R', action='store_true', help='Use RMSNorm instead of LayerNorm in the model')
-    parser.add_argument('--max_iters', '-m', type=int, default=10000, help='Maximum number of training iterations')
+    parser.add_argument('--max_iters', '-m', type=int, default=100000, help='Maximum number of training iterations')
     parser.add_argument('--batch_size', '-b', type=int, default=64, help='Batch size for training')
     parser.add_argument('--subset', action='store_true', help='Use a small subset of data to use for training')
     parser.add_argument('--model', '-M', type=str, default='gpt2', help='Model architecture to use (e.g., gpt2, gpt2-medium)')
