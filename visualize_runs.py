@@ -19,12 +19,15 @@ def main():
             # Simple visualization using matplotlib
             import matplotlib.pyplot as plt
 
+            # get the directory name for title
+            dir_name = os.path.basename(dir_path)
+
             # save to file
             plt.figure(figsize=(10, 5))
             plt.plot(train_losses, label='Training Loss')
             plt.xlabel('Iteration')
             plt.ylabel('Loss')
-            plt.title('Training Loss over Iterations')
+            plt.title(f'Training Loss for {dir_name}')
             plt.legend()
             plt.grid(True)
             plot_path = os.path.join(dir_path, 'training_loss.png')
